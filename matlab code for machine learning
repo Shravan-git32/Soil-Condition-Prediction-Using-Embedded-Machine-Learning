@@ -1,0 +1,31 @@
+% Load data from CSV file
+data = readtable('soil_data.csv');  % Columns: moisture, temp, label
+features = data{:, {'moisture', 'temp'}};
+labels = categorical(data.label);  % Ensure labels are categorical
+
+% Train model (SVM)
+model = fitcecoc(features, labels);
+
+% Evaluate model accuracy
+cvmodel = crossval(model, 'KFold', 5);
+accuracy = 1 - kfoldLoss(cvmodel);
+fprintf("Model accuracy: %.2f%%\n", accuracy * 100);
+
+% Save model
+saveLearnerForCoder(model, 'soilModel');
+
+% Create prediction wrapper
+% Save as predictSoilCondition.m
+% -------------------------------
+% function label = predictSoilCondition(input)
+%     %#codegen
+%     persistent trainedModel;
+%     if isempty(trainedModel)
+%         trainedModel = loadLearnerForCoder('soilModel');
+%     end
+%     label = predict(trainedModel, input);
+% end
+% -------------------------------
+
+% Generate C code
+codegen predictSoilCondition -args {zeros(1,2)} -config:lib
