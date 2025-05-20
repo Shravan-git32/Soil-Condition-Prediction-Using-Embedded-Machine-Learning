@@ -1,0 +1,85 @@
+// SoilPredictorESP32.ino - Final ready code
+
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include "DHT.h"
+#include "predictSoilCondition.h"
+#include "categorical.h"
+
+
+
+#define DHTPIN 4          // Adjust to your ESP32 DHT22 pin
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2); // adjust 0x27 if needed
+const int soilSensorPin = 12;  // Your soil sensor analog pin
+
+unsigned long lastSwitchTime = 0;
+bool showFirstScreen = true;
+
+// inside setup()
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+  lcd.init();
+  lcd.backlight();
+}
+
+// inside loop()
+void loop() {
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+  int soilValue = analogRead(soilSensorPin);
+
+  double input = (double)soilValue;
+  categorical label;
+  predictSoilCondition(&input, &label);
+
+  String soilCondition = "";
+  if (label.data == 0) {
+    soilCondition = "WET";
+  } else if (label.data == 1) {
+    soilCondition = "DRY";
+  } else if (label.data == 2) {
+    soilCondition = "Optimal";
+  } else {
+    soilCondition = "Unknown";
+  }
+
+  Serial.println("-------------------------");
+  Serial.print("Temperature: "); Serial.print(temperature); Serial.println(" C");
+  Serial.print("Humidity: "); Serial.print(humidity); Serial.println(" %");
+  Serial.print("Soil Moisture: "); Serial.println(soilValue);
+  Serial.print("Soil Condition: "); Serial.println(soilCondition);
+  Serial.println("-------------------------");
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastSwitchTime >= 3000) { // switch screen every 3 sec
+    showFirstScreen = !showFirstScreen;
+    lastSwitchTime = currentMillis;
+
+    lcd.clear();
+    if (showFirstScreen) {
+      lcd.setCursor(0, 0);
+      lcd.print("Temp:");
+      lcd.print(temperature, 1);
+      lcd.print((char)223); // degree symbol
+      lcd.print("C");
+
+      lcd.setCursor(0, 1);
+      lcd.print("Hum:");
+      lcd.print(humidity, 0);
+      lcd.print("%");
+    } else {
+      lcd.setCursor(0, 0);
+      lcd.print("Soil:");
+      lcd.print(soilValue);
+
+      lcd.setCursor(0, 1);
+      lcd.print(soilCondition);
+    }
+  }
+
+  delay(200); // Just a small delay
+}
+
